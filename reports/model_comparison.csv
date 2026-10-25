@@ -1,0 +1,4 @@
+Model,Accuracy,Baseline,Recall (unsafe),F1,ROC AUC,"Cost (dangerous=10, harmless=1)",CV accuracy (train)
+Decision Tree,0.622,0.61,0.853,0.351,0.573,779,0.639 +/- 0.016
+k-Nearest Neighbours,0.633,0.61,0.863,0.367,0.617,736,0.632 +/- 0.018
+Naive Bayes,0.605,0.61,0.875,0.266,0.6,709,0.623 +/- 0.008
