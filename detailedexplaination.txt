@@ -1,0 +1,464 @@
+Detailed Explanation - Drinking Water Safety Classifier (Project 9)
+====================================================================
+Team note: Ye file is liye banayi gayi hai taake team ka har banda
+poora project Stage A se end tak, layman (aam) zaban mein samajh sake,
+aur viva / sir ke sawaalon ka jawab de sake. Is file mein koi code
+nahi hai, sirf samajh hai. Numbers hamare asal project ke hain.
+
+Project kya hai, ek line mein
+------------------------------
+Ek municipal water inspector ya NGO field officer paani ke field
+readings app mein dalta hai, aur app batata hai: paani safe hai ya
+unsafe, kis parameter ki wajah se, aur kya action lena hai. Agar
+readings adhoori hon to app jhoot nahi bolta, saaf warn karta hai
+ke is result par poora bharosa mat karo.
+
+User kaun hai? Municipal inspector / NGO field officer.
+Problem kya hai? Poori lab test slow aur mehngi hai, is liye zyada
+tar community water points kabhi test hi nahi hote.
+Product kya karta hai? Field readings se safe / unsafe verdict,
+parameter responsible, recommended action, aur incomplete readings
+par warning.
+
+Dataset kya hai?
+-----------------
+Kaggle Water Potability dataset. 3,276 samples, 10 columns.
+9 chemical parameters + 1 target:
+ph, Hardness, Solids, Chloramines, Sulfate, Conductivity,
+Organic_carbon, Trihalomethanes, Turbidity, aur target Potability.
+Potability = 1 matlab safe / potable, 0 matlab unsafe / not potable.
+File: data/raw/water_potability.csv. Is original file ko kabhi edit
+mat karna. Saaf file alag banegi: data/cleaned/water_cleaned_v1.csv.
+
+STAGE A - Data aur Data Dictionary
+-----------------------------------
+Kya kiya?
+Har column ke liye ek dictionary likhi: naam, measurement type,
+plausible range, aur role (identifier, explanatory, target, ya
+must-not-use).
+
+Kyun kiya? Faida kya hai?
+Ye patient ki file banane jaisa hai. Agar ye na likho to model ko
+pata hi nahi chalega ke wo kya parh raha hai. Wo Sample ID jaise
+bekaar number ko bhi paani ki quality samajh lega, jo bilkul ghalat
+hoga. Dictionary se ye bhi tay hota hai ke kaunsi column input hai,
+kaunsi target hai, aur kaunsi kabhi input nahi banegi.
+
+Measurement types, layman mein:
+- Nominal: Sirf naam wali category, ismein order nahi hota.
+  Example: safe / unsafe, paani ka source (well, tap, river).
+- Ordinal: Order wali category. Example: low / medium / high.
+- Interval: Farq ka matlab hai, lekin zero asli nahi hai.
+  Example: pH, Celsius temperature. pH 0 ka matlab paani na hona
+  nahi hai, is liye pH interval hai.
+- Ratio: Asli zero hai, zero ka matlab wo cheez hai hi nahi.
+  Example: Hardness, Turbidity, Solids. Turbidity 0 ka matlab
+  paani bilkul saaf hai.
+
+Hamare project mein: pH interval hai, baaki zyada tar ratio hain,
+aur Potability nominal hai. To 3 measurement types poori ho gayin.
+Total attributes: 9 features + target + Sample ID = 11, jo Stage A
+ke requirement (kam se kam 10 attributes, kam se kam 2,000 records)
+se zyada hai.
+
+Target kya hai?
+Potability, jo predict karni hai. Ye kabhi input nahi banegi,
+warna ye cheating jaisi hogi.
+
+Leakage / Not-known-at-prediction-time kya hai?
+Leakage matlab wo column jo prediction ke waqt pata hi nahi hogi,
+lekin hum ghalti se input bana dein. Example: khud target ko input
+banana, ya future ka lab result field mein use karna.
+Hamare project mein:
+- Potability khud target hai, input nahi.
+- Sample ID sirf identifier hai, paani ki property nahi.
+- Field-kit screen ke liye: Sulfate, Organic_carbon aur
+  Trihalomethanes ko lab chahiye hoti hai, field officer ke paas
+  foran nahi hoti. Is liye field-kit model sirf portable parameters
+  use karta hai, aur confidence loss saaf batata hai.
+
+Sir pooche to jawab:
+"Stage A mein humne data ko define kiya, dictionary likhi, aur ye
+tay kiya ke kya input hai, kya target hai, aur kya leakage ki wajah
+se nahi use karna."
+
+STAGE B - Data Quality Audit aur Repair
+----------------------------------------
+Kya kiya?
+Data mein ghaltiyan dhoondi, har ghalti ki count ke saath, phir
+unko repair kiya, aur har repair ka proof rakha.
+
+Hamare asal numbers:
+- Total missing cells: 1,434, jo 1,265 rows ko affect karte hain.
+- Sulfate missing: 781, ph missing: 491, Trihalomethanes missing: 162.
+- Baaki 7 columns mein missing: 0.
+- Duplicates: 0. Ye honestly likha hai, invent nahi kiya.
+- Target balance: unsafe 1,998 (61%), safe 1,278 (39%).
+- Outliers (IQR rule se): Hardness 83, Chloramines 61, ph 46, aur
+  baaki columns mein bhi kuch. Outliers delete nahi kiye, sirf
+  report kiye, kyunki paani ke data mein extreme value hamesha
+  ghalti nahi hoti.
+- Invalid range: Sirf Solids mein 1 value hamari plausible range
+  60,000 se upar thi, baaki sab range mein the.
+
+Kyun kiya? Faida kya hai?
+Ye file mein ghaltiyan dhoondne jaisa hai: blank pages, duplicate
+pages, impossible values jaise negative turbidity ya pH 14 se upar.
+Agar ye na karo to model ghalat data par seekhega aur ghalat faisle
+dega. Audit se ye bhi pata chalta hai ke data kitna bharosemand hai.
+
+Repair kaise ki?
+Missing values ko median se bhara. Median is liye chuna, kyunki
+median outliers se kharab nahi hota, mean ho jata hai.
+Saari missing rows delete nahi ki, warna 1,265 rows, taqreeban 38%
+data, zaya ho jata aur model biased ho jata.
+
+Provenance kya hai?
+Har repaired field ke liye ek nishan wali column, jaise
+ph_was_imputed, Sulfate_was_imputed, Trihalomethanes_was_imputed.
+Is se pata chalta hai ke kaunsi value original thi aur kaunsi
+bhari gayi. Yehi transparency marker chahta hai.
+
+Validate() kya hai?
+10+ rules ki checklist. Example rules: koi missing na ho, koi
+duplicate na ho, target sirf 0/1 ho, pH 0-14 mein ho, koi negative
+value na ho, provenance columns maujood hon.
+Ye raw data par FAIL honi chahiye aur cleaned data par PASS honi
+chahiye. Agar dono par pass ho jaye to validate() ka koi faida
+nahi hai. Hamare project mein yehi hua: raw par fail (missing
+values ki wajah se), cleaned par pass (3,276 rows).
+
+Sir pooche to jawab:
+"Stage B mein humne 6+ fault categories audit ki, har ek ki count
+ke saath, median se repair ki, provenance columns rakhe, aur
+validate() se proof diya ke cleaning kaam ki."
+
+Special challenge - Missingness jo random nahi hai:
+---------------------------------------------------
+Is project ka special challenge ye hai ke kuch parameters bohat
+zyada missing hain, aur ye missing hona accidental nahi ho sakta.
+Example: lab wala test mehnga hai ya time lagta hai, is liye wo
+aksar missing hota hai.
+
+Humne kya kiya?
+Missing rate ko safe aur unsafe dono groups mein compare kiya.
+Example: Sulfate unsafe mein 24.4% missing, safe mein 22.9% missing.
+Sirf target dekh kar ye nahi keh sakte ke missingness random hai
+ya nahi, is liye humne 4 treatments ko held-out data (train par
+5-fold CV) par compare kiya:
+- Drop rows: accuracy 0.632, recall unsafe 0.916
+- Median impute: accuracy 0.637, recall unsafe 0.917
+- KNN impute: accuracy 0.621, recall unsafe 0.884
+- Median + missing indicator: accuracy 0.637, recall unsafe 0.916
+
+Winner: median + missing indicator chuna gaya, kyunki ismein data
+zaya nahi hota, aur ye extra info bhi rakhta hai ke value pehle
+missing thi. KNN slow bhi tha aur accuracy bhi kam thi.
+
+App mein missing reading ka kya hota hai?
+App model ko phir bhi jawab dene deta hai, lekin warning deta hai
+ke readings missing thin, is liye prediction kam certain hai. Agar
+5 ya zyada readings missing hon to app kehta hai ke is result par
+bharosa mat karo, lab test karwao. Yehi sensible behaviour hai.
+
+STAGE C - Pre-processing
+-------------------------
+Kya kiya?
+Model ke liye data ko tayyar kiya: scaling ka faisla, feature
+selection vs PCA ka comparison, aur discretization.
+
+Scaling kya hai? Kyun zaroori hai?
+Alag units ko ek scale par lana. Example: Solids 20,000 ke aas
+paas hota hai aur pH 7 ke aas paas. Agar scale na karo to kNN jaise
+model mein Solids ki doori hi sab kuch decide kar degi, pH ki awaz
+dab jayegi.
+Decision Tree ko scaling nahi chahiye, kyunki wo sirf threshold par
+split karta hai, jaise pH 6.5 se kam ya zyada.
+kNN aur Neural Network ko StandardScaler chahiye.
+Naive Bayes ko scaler nahi chahiye.
+
+Feature selection vs PCA, kya farq hai?
+Feature selection matlab behtareen features chunna, baaki chhor dena.
+PCA matlab naye combined features banana, jo asli features ka
+mixture hote hain.
+Humne dono ko same Decision Tree par, same CV par compare kiya:
+- All features: accuracy 0.637
+- Select 5 best features: accuracy taqreeban 0.629-0.631
+- PCA 5 components: accuracy 0.619
+All features jeete, is liye saare 9 features rakhe. Ek aur wajah:
+explanation mein asli parameter ka naam chahiye hota hai, PCA ke
+components ka naam nahi hota, to user ko wajah samajh nahi ayegi.
+
+Discretization / Binarization kya hai?
+Continuous value ko bins (dabbon) mein dalna. Example: pH ko WHO
+range ke hisab se safe / unsafe mein dalna.
+Humne discretized Naive Bayes bhi report kiya (quantile bins, 5 bins):
+accuracy 0.614, AUC 0.583. Ye Stage C ka proof hai. Main Naive Bayes
+Gaussian wala hai, discretized wala sirf comparison ke liye hai.
+
+Sir pooche to jawab:
+"Scaling har model family ke liye alag decide ki, feature selection
+aur PCA ko same model par compare kiya, aur discretization WHO
+range aur quantile bins se justify ki."
+
+STAGE D - Models
+----------------
+Kya kiya?
+3 classifiers, 3 alag families se, same train data aur same test
+set par train kiye aur compare kiye.
+
+1. Decision Tree (explainable, lazmi tha):
+   Flowchart jaisa hai. Agar pH kam hai to ek taraf, warna doosri
+   taraf, aise rules se faisla karta hai. Is liye isko explain kar
+   sakte hain. Hamara best tree: criterion entropy, max_depth 5,
+   min_samples_leaf 5. Test accuracy 0.622, AUC 0.573.
+
+2. k-Nearest Neighbours (kNN):
+   Kehta hai ke is sample se milte julte pehle wale samples kya
+   the, unki majority se faisla karo. Hamara best: n_neighbors 15,
+   p=1 (Manhattan distance), weights distance (qareebi ka zyada
+   weight). Test accuracy 0.633, AUC 0.617. Ye best model raha.
+
+3. Gaussian Naive Bayes:
+   Probability se faisla karta hai, har parameter ka evidence jodta
+   hai. Hamara best: var_smoothing 1e-8. Test accuracy 0.605,
+   AUC 0.600.
+
+Kyun 3 models?
+Koi ek model har data par best nahi hota. Teenon ko same test par
+chalane se fair comparison hota hai, aur pata chalta hai ke kaunsa
+kab behtar hai.
+
+Hyperparameters kya hain? Aur GridSearchCV kya hai?
+Hyperparameters matlab model ki settings, jaise tree ki depth kitni
+ho, kNN mein kitne neighbours hon. Ye model training ke dauran
+nahi seekhta, humko set karne parte hain.
+GridSearchCV matlab settings ka jaal bana kar har combination ko
+cross-validation par systematically try karna, jo behtareen ho wo
+rakhna. Ye andaze se numbers try karne se alag hai, aur test data
+ko dekh kar settings chunna cheating hoti, is liye tuning sirf
+train data par ki gayi.
+
+Overfitting kya hai?
+Model ne train data rat liya ho, test par fail ho jaye. Is se
+bachne ke liye test ko alag rakha, aur CV use kiya.
+
+Pipeline kya hai?
+Steps ka chain ek file mein: imputer + scaler (agar chahiye) +
+model. Is se test par wahi steps lagte hain jo train par lage the,
+aur koi step bhoolta nahi hai. Hamare models .pkl files mein
+poori pipeline ke saath save hain.
+
+Sir pooche to jawab:
+"Humne 3 families se 3 models liye, Decision Tree explainability
+ke liye lazmi tha, hyperparameters GridSearchCV se train par chune,
+aur sabko same test set par compare kiya."
+
+STAGE E - Evaluation
+--------------------
+Kya kiya?
+Model ko exam diya, aur sirf accuracy nahi, uski keemat bhi dekhi.
+
+Train / Test Split kya hai?
+Kitab parhna (train) aur exam dena (test) alag alag hona chahiye.
+Test wale samples model ne pehle kabhi nahi dekhe hone chahiye,
+warna result jhoota hoga.
+Hamara split: stratified 80/20, random_state 42.
+Train: 2,620 rows, Test: 656 rows.
+Stratified matlab train aur test dono mein safe / unsafe ka ratio
+same rahe, warna exam easy ya mushkil ho jayega.
+Is dataset mein date nahi hai, is liye time-based split nahi kiya,
+stratified random split justify kiya. Agar date hoti to time-based
+split lazmi hota.
+
+Majority-class Baseline kya hai? Kyun zaroori hai?
+Agar hum har dafa sirf majority class, unsafe, bol dein to bhi
+61% accuracy mil jayegi bina kuch sikhe. Is liye har accuracy ke
+saath baseline likhna lazmi hai, warna accuracy akeli dhoka deti hai.
+Hamara test baseline: 0.610.
+Decision Tree 0.622, kNN 0.633, Naive Bayes 0.605. Naive Bayes
+accuracy mein baseline se thora neeche hai, ye humne chhupaya nahi,
+yehi honest reporting hai.
+
+Accuracy ke ilawa 2 metrics kyun liye?
+Accuracy akeli kaafi nahi hai, kyunki unsafe zyada hain (61%).
+Humne ye 2 liye, kyunki is user ke liye ye sab se important hain:
+- Recall (unsafe): Asli unsafe mein se kitne pakre gaye.
+  Ye sab se important hai, kyunki unsafe ko safe kehna jaan ka
+  khatra hai. Hamare models ka recall unsafe 0.853 se 0.875 tak hai.
+- F1: Precision aur Recall ka balance. Precision matlab jab safe
+  kaha to kitni dafa sahi tha.
+
+Confusion Matrix kya hai?
+4 dabbe: sahi unsafe, sahi safe, aur 2 ghaltiyan.
+Test set par:
+- Decision Tree: [[341, 59], [189, 67]]
+- kNN: [[345, 55], [186, 70]]
+- Naive Bayes: [[350, 50], [209, 47]]
+Rows actual hain, columns predicted hain, order [unsafe, safe] hai.
+
+ROC Curve aur AUC kya hai?
+ROC curve har threshold par model ki performance dikhati hai.
+AUC ek number hai: 0.5 matlab coin toss, 1.0 matlab perfect.
+Hamara best AUC: kNN 0.617, Decision Tree 0.573, Naive Bayes 0.600.
+Ye batata hai ke model kamzor hai lekin coin toss se behtar hai.
+Ye bhi honestly batana hai, exaggerate nahi karna.
+
+Cost Matrix aur Threshold kya hai? Ye sab se important point hai.
+Dono ghaltiyon ki keemat barabar nahi hai:
+- Dangerous ghalti: unsafe paani ko safe kehna, cost 10.
+- Harmless-side ghalti: safe paani ko unsafe kehna, cost 1.
+Is liye threshold 0.5 par nahi chhora. Threshold train ke
+out-of-fold probabilities se chuna gaya: 0.85.
+Iska matlab paani ko safe kehne ke liye 85% confidence chahiye,
+warna unsafe keh do.
+Test par asar:
+- Threshold 0.5: accuracy 0.633, cost 736
+- Threshold 0.85: accuracy 0.613, cost 254
+Accuracy thori giri, lekin cost bohat kam ho gayi, kyunki dangerous
+ghaltiyan kam ho gayin. Yehi trade-off marker dekhna chahta hai.
+Ek correction jo humne ki thi: pehle cost function mein sklearn ke
+confusion matrix ke FP/FN cells ulte lag gaye the, jis se threshold
+galat taraf ja raha tha (0.10). Us ko theek kiya, dangerous error
+ko hi cost 10 di, phir dobara run kiya, tab 0.85 wala sahi result
+aaya. Ye viva mein batane wali honest baat hai.
+
+K-fold Cross-Validation kya hai?
+Data ko 5 hisson mein baant kar baari baari har hisse ko test
+banana, baaki par train karna. Mean ke saath spread bhi batana,
+sirf mean nahi.
+Example: Decision Tree CV accuracy 0.639 +/- 0.016, kNN
+0.632 +/- 0.018, Naive Bayes 0.623 +/- 0.008.
+Spread chhota hona batata hai ke result lucky nahi hai, stable hai.
+
+Sir pooche to jawab:
+"Humne stratified 80/20 split ki, baseline ke saath accuracy di,
+recall unsafe aur F1 liye kyunki unsafe miss karna sab se khatarnak
+hai, ROC/AUC di, cost matrix se threshold 0.85 chuna, aur 5-fold CV
+ka mean ke saath spread diya."
+
+STAGE F - Explanation
+---------------------
+Kya kiya?
+Har prediction ke saath uski wajah, user ki zaban mein di.
+
+Ghalat tareeqa: "node 14, gini 0.31" - inspector ko ye samajh nahi
+ayega, aur wo action nahi le sakega.
+Sahi tareeqa: "pH 5.1 hai, safe range 6.5-8.5 se kam hai, Turbidity
+5 ya zyada hai, matlab paani cloudy hai, is liye unsafe hai, ye
+paani mat piyo, lab test karwao."
+
+Har model apne tareeqe se explain karta hai:
+- Decision Tree: decision path, rule by rule translate kiya.
+- kNN: sab se milte julte pehle wale samples dikhaye, unmein se
+  kitne safe the aur kitne unsafe the.
+- Naive Bayes: wo features dikhaye jinhone posterior ko sab se
+  zyada safe ya unsafe ki taraf dhakela.
+
+Faida: User model par trust karega, wajah samajh kar action le
+sakega, aur blind trust nahi karega.
+
+STAGE G - Application (Web App)
+--------------------------------
+Kya kiya?
+Sirf notebook nahi, ek poora product banaya: Streamlit app, 6 screens.
+Chalane ka tareeqa, project folder se, ek command:
+  pip install -r requirements.txt
+  streamlit run app.py
+Koi path edit nahi karna, koi dataset alag se download nahi karna,
+data aur models repo mein shipped hain. Marker ke laptop par bhi
+yehi command chalegi, yehi product hone ka matlab hai.
+
+6 screens, har ek ka faida:
+1. Data & Quality: Data load karo, audit report dekho, cleaned file
+   download karo. Is se data ka trust banta hai.
+2. Model Performance: 3 models ki comparison table, ROC curve,
+   confusion matrix, baseline har figure ke saath. Is se model ka
+   trust banta hai.
+3. Single Prediction: Ek case ka form bharo, prediction + confidence
+   + explanation + action milega. Ye field officer ka asli kaam hai.
+4. Batch Scoring: Kai cases ki CSV upload karo, ranked aur filterable
+   table milegi, sab se risky pehle, phir result download karo. Ye
+   kai gaon ka data ek saath check karne ke liye hai.
+5. Settings: Model choose karo, threshold hilao, cost matrix edit
+   karo, aur consequences live dekho. Is se pata chalta hai ke
+   threshold badalne se accuracy, recall aur cost par kya asar
+   parta hai.
+6. Field Kit (domain-specific screen): Phone ke liye, sirf wo
+   parameters jo portable kit measure kar sakta hai: ph, Turbidity,
+   Conductivity, Solids. Baaki parameters nahi hain, aur app saaf
+   kehta hai ke confidence kam ho gaya hai: full model AUC 0.617,
+   field-kit AUC 0.539, loss 0.078. Ye field-kit verdict lab result
+   nahi hai, sirf warning hai.
+
+App ki ek limitation, honestly:
+Settings screen test set ke results ko live badalti hai, Single
+Prediction screen ka threshold is se nahi badalta, wo hamesha 0.5
+par verdict deta hai. Report mein isko chhupana mat.
+
+Testing - Har screen par kya check karna hai
+---------------------------------------------
+Screen 1: Raw 3,276 rows, missing Sulfate 781 / ph 491 /
+Trihalomethanes 162, cleaned download 3,276 rows, 13 columns.
+Screen 2: Comparison table upar wale numbers se match kare, ROC
+curves dikhen, confusion matrices upar wale numbers se match karein.
+Screen 3, unsafe test: ph 5.1, Hardness 200, Solids 21000,
+Chloramines 7, Sulfate 330, Conductivity 420, Organic_carbon 14,
+Trihalomethanes 66, Turbidity 6.0. Expected: teeno unsafe. Decision
+Tree 64.5%, kNN 81.0%, Naive Bayes 75.7%. Wajah: pH range se bahar
+aur Turbidity zyada.
+Screen 3, safe test: ph 6.79, Hardness 209.13, Solids 20149.18,
+Chloramines 5.8, Sulfate 288.36, Conductivity 291.3, Organic_carbon
+12.33, Trihalomethanes 57.3, Turbidity 3.08. Expected: Decision Tree
+safe 50.7% (barely safe), kNN safe 55.9%, Naive Bayes is par bhi
+unsafe kahega, ye model disagreement hai, bug nahi hai.
+Screen 3, missing test: ph aur Sulfate missing tick karo, baaki
+median values. Expected: warning aaye ke 2 readings missing thin.
+Screen 4, batch: test_batch.csv upload karo. Expected: safe wali
+row ranked table mein aakhir mein aaye, filter unsafe/safe kaam
+kare, download mein prob_safe, prob_unsafe aur verdict columns hon.
+Screen 5, settings: kNN par threshold 0.5 par accuracy 0.633, cost
+736; threshold 0.85 par accuracy 0.613, cost 254; threshold 0.2 par
+accuracy 0.453, cost 3374. Ye dikhata hai ke threshold neeche karna
+dangerous hai.
+Screen 6, field kit: ph 5.1, Turbidity 6.0, Conductivity 420,
+Solids 21000. Expected: upar AUC loss wali warning, prediction
+unsafe 60.7%, p_safe 0.393.
+
+Viva ke liye 10 terms, ek line mein
+-----------------------------------
+1. Imputation: Missing value bharna, median ya KNN se.
+2. MNAR: Missing hona random nahi hai, kisi wajah se hai, jaise
+   mehnga lab test.
+3. Pipeline: Steps ka chain ek file mein, imputer + scaler + model.
+4. Leakage: Exam se pehle answer dekh lena, jaise test par scaler
+   fit karna ya target ko input banana.
+5. Stratified split: Train aur test mein safe/unsafe ka ratio same
+   rakhna.
+6. Overfitting: Train data rat lena, test par fail ho jana.
+7. Baseline: Sirf majority class bolne par milne wali accuracy, 0.610.
+8. Recall (unsafe): Asli unsafe mein se kitne pakre gaye.
+9. ROC AUC: Har threshold par ranking ki quality, 0.5 coin toss.
+10. Cost matrix: Ghaltiyon ki keemat, dangerous 10, harmless 1.
+
+Team ke liye GitHub ka short summary
+-------------------------------------
+GitHub sirf code aur data share karta hai, installed libraries nahi.
+Is liye har teammate ko ye karna parega, ek dafa:
+  python -m venv venv
+  venv\Scripts\activate   (Windows par)
+  pip install -r requirements.txt
+  streamlit run app.py
+Dataset download nahi karna, training dobara nahi chalani, kyunki
+data aur models repo mein hain.
+Kaam shuru karne se pehle Pull karo, khatam karke Commit aur Push
+karo. venv/ ko kabhi GitHub par mat dalo, .gitignore usko rokta hai.
+
+Aakhri baat - Honest results kyun important hain
+-------------------------------------------------
+Hamare models baseline se sirf thora upar hain, Naive Bayes to
+accuracy mein baseline se thora neeche bhi hai. Ye failure nahi hai,
+ye dataset ki asal kahani hai. Agar hum ye chhupate ya numbers
+barha chadha kar batate to viva mein pakre jate. Honest numbers,
+baseline ke saath, cost-based threshold, aur field-kit ka confidence
+loss saaf batana hi is project ki strength hai.
